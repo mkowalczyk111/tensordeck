@@ -50,6 +50,7 @@ jobs:
   build-android:
     name: Build Android APK (Capacitor)
     runs-on: ubuntu-latest
+    needs: build-windows
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,3 +87,21 @@ jobs:
         with:
           name: TensorDeck-Android-Debug-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Get version from package.json
+        id: get_version
+        run: |
+          VERSION=$(node -e "console.log(require('./package.json').version)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Rename APK for release
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/TensorDeck-Android-Debug.apk
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.get_version.outputs.version }}
+          files: android/app/build/outputs/apk/debug/TensorDeck-Android-Debug.apk
+          draft: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
