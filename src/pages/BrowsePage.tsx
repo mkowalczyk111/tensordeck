@@ -1,0 +1,226 @@
+import { useState, useMemo } from 'react';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import TextField from '@mui/material/TextField';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import CardActions from '@mui/material/CardActions';
+import Fab from '@mui/material/Fab';
+import Stack from '@mui/material/Stack';
+import Chip from '@mui/material/Chip';
+import Tooltip from '@mui/material/Tooltip';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ThumbUpIcon from '@mui/icons-material/ThumbUp';
+import LoopIcon from '@mui/icons-material/Loop';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import { useNav } from '../App';
+import { SegmentedProgressBar, computeCardStats } from '../components/SegmentedProgressBar';
+import type { Flashcard, SrsState } from '../types/models';
+
+type BrowseFilter = 'all' | 'review' | 'new' | 'mastered';
+
+function srsChip(state: SrsState): { text: string; color: 'default' | 'info' | 'warning' | 'success' | 'error' } {
+  switch (state.state) {
+    case 0: return { text: 'Nowa', color: 'info' };
+    case 1: return { text: 'Uczona', color: 'warning' };
+    case 2: return state.repetitions >= 3
+      ? { text: 'Opanowana', color: 'success' }
+      : { text: 'Powtórka', color: 'success' };
+    case 3: return { text: 'Relearning', color: 'error' };
+    default: return { text: '?', color: 'default' };
+  }
+}
+
+function daysUntilReview(state: SrsState): string {
+  if (state.state === 0) return 'Nowa';
+  const diff = state.nextReviewTimestamp - Date.now();
+  if (diff <= 0) return 'Teraz';
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return `${days}d`;
+}
+
+function masteryPercent(state: SrsState): number {
+  if (state.state === 0) return 0;
+  return Math.min(100, Math.round(Math.min(state.stability / 30, 1) * 100));
+}
+
+export function BrowsePage() {
+  const { nav, goBack, store } = useNav();
+  const groupId = nav.params.groupId || '';
+  const group = store.groups.find(g => g.id === groupId);
+  const [search, setSearch] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPages, setEditPages] = useState<string[]>([]);
+  const [deleteCardId, setDeleteCardId] = useState<string | null>(null);
+  const [browseFilter, setBrowseFilter] = useState<BrowseFilter>('all');
+
+  const stats = useMemo(() => group ? computeCardStats(group.cards) : { total: 0, newCount: 0, learning: 0, review: 0, mastered: 0 }, [group]);
+
+  const filtered = useMemo(() => {
+    if (!group) return [];
+    let cards: Flashcard[];
+    // Filter by SRS STATE, not due date — so user sees all cards in that category
+    switch (browseFilter) {
+      case 'new': cards = group.cards.filter(c => c.srsState.state === 0); break;
+      case 'review': cards = group.cards.filter(c => c.srsState.state > 0 && (c.srsState.repetitions < 3 || c.srsState.state !== 2)); break;
+      case 'mastered': cards = group.cards.filter(c => c.srsState.repetitions >= 3 && c.srsState.state === 2); break;
+      case 'all': default: cards = [...group.cards]; break;
+    }
+    const q = search.toLowerCase();
+    if (q) cards = cards.filter(c => c.pages.some(p => p.toLowerCase().includes(q)));
+    return cards;
+  }, [group, search, browseFilter]);
+
+  const startEdit = (card: Flashcard) => { setEditingId(card.id); setEditPages([...card.pages]); };
+  const cancelEdit = () => { setEditingId(null); setEditPages([]); };
+  const saveEdit = () => {
+    if (!editingId || !group) return;
+    const filledCount = editPages.filter(p => p.trim()).length;
+    // Need at least 2 filled pages, otherwise delete
+    if (filledCount < 2) {
+      store.deleteFlashcard(groupId, editingId);
+      cancelEdit(); return;
+    }
+    const card = group.cards.find(c => c.id === editingId);
+    if (card) store.updateFlashcard(groupId, { ...card, pages: editPages });
+    cancelEdit();
+  };
+  const addCard = () => {
+    if (!group) return;
+    const pages = group.pageNames.map(() => '');
+    const id = store.addFlashcard(groupId, pages);
+    setEditingId(id); setEditPages(pages);
+  };
+
+  if (!group) return (
+    <Box sx={{ p: 4 }}><Typography>Grupa nie znaleziona.</Typography><Button onClick={goBack}>Powrót</Button></Box>
+  );
+
+  return (
+    <Box sx={{ p: 3, pb: 12, maxWidth: 800, mx: 'auto' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+        <IconButton onClick={goBack}><ArrowBackIcon /></IconButton>
+        <Typography variant="h5" sx={{ fontWeight: 700, flexGrow: 1 }}>{group.name}</Typography>
+        <Typography variant="body2" color="text.secondary">{stats.total} fiszek</Typography>
+      </Box>
+
+      {/* Segmented progress bar */}
+      <Box sx={{ mb: 3 }}>
+        <SegmentedProgressBar stats={stats} height={14} showLegend />
+      </Box>
+
+      <TextField fullWidth label="Szukaj fiszek..." variant="outlined" value={search}
+        onChange={e => setSearch(e.target.value)} sx={{ mb: 2 }} />
+
+      {/* Filter chips — colors match the progress bar segments */}
+      <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
+        <Chip label={`Wszystkie (${stats.total})`} variant={browseFilter === 'all' ? 'filled' : 'outlined'}
+          color={browseFilter === 'all' ? 'primary' : 'default'} clickable onClick={() => setBrowseFilter('all')} />
+        <Chip label={`W powtórkach (${stats.learning + stats.review})`} variant={browseFilter === 'review' ? 'filled' : 'outlined'}
+          color={browseFilter === 'review' ? 'success' : 'default'} clickable onClick={() => setBrowseFilter('review')} />
+        <Chip label={`Nowe (${stats.newCount})`} variant={browseFilter === 'new' ? 'filled' : 'outlined'}
+          color={browseFilter === 'new' ? 'info' : 'default'} clickable onClick={() => setBrowseFilter('new')} />
+        <Chip label={`Opanowane (${stats.mastered})`} variant={browseFilter === 'mastered' ? 'filled' : 'outlined'}
+          color={browseFilter === 'mastered' ? 'secondary' : 'default'} clickable onClick={() => setBrowseFilter('mastered')} />
+      </Box>
+
+      <Stack spacing={2}>
+        {filtered.map(card => {
+          const srs = srsChip(card.srsState);
+          const mastery = masteryPercent(card.srsState);
+          const reviewIn = daysUntilReview(card.srsState);
+          return (
+            <Card key={card.id} sx={editingId === card.id ? { borderLeft: '4px solid', borderColor: 'primary.main' } : {}}>
+              {editingId === card.id ? (
+                <>
+                  <CardContent>
+                    <Stack spacing={2}>
+                      {editPages.map((page, i) => (
+                        <TextField key={i} fullWidth label={group.pageNames[i] || `Strona ${i + 1}`}
+                          value={page} onChange={e => {
+                            const next = [...editPages]; next[i] = e.target.value; setEditPages(next);
+                          }} />
+                      ))}
+                    </Stack>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'flex-end', gap: 1, px: 2, pb: 2 }}>
+                    <Button onClick={cancelEdit}>Anuluj</Button>
+                    <Button variant="contained" onClick={saveEdit}>Zapisz</Button>
+                  </CardActions>
+                </>
+              ) : (
+                <>
+                  <CardContent sx={{ pb: 0 }}>
+                    <Stack spacing={0.5}>
+                      {card.pages.map((page, i) => (
+                        <Box key={i}>
+                          <Typography variant="caption" color="text.secondary">
+                            {group.pageNames[i] || `Strona ${i + 1}`}:
+                          </Typography>
+                          <Typography variant="body1" sx={{ fontWeight: i === 0 ? 600 : 400 }}>{page}</Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'space-between', px: 2, py: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Chip label={srs.text} color={srs.color} size="small" />
+                      {card.srsState.state > 0 && (
+                        <>
+                          <Tooltip title={`Opanowanie: ${mastery}%`}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                              <ThumbUpIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary">{mastery}%</Typography>
+                            </Box>
+                          </Tooltip>
+                          <Tooltip title={`Powtórzeń: ${card.srsState.repetitions}`}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                              <LoopIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary">{card.srsState.repetitions}</Typography>
+                            </Box>
+                          </Tooltip>
+                          <Tooltip title={`Powtórka za: ${reviewIn}`}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.3 }}>
+                              <CalendarTodayIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+                              <Typography variant="caption" color="text.secondary">{reviewIn}</Typography>
+                            </Box>
+                          </Tooltip>
+                        </>
+                      )}
+                    </Box>
+                    <Box sx={{ display: 'flex' }}>
+                      <IconButton color="primary" size="small" onClick={() => startEdit(card)}><EditIcon fontSize="small" /></IconButton>
+                      <IconButton color="error" size="small" onClick={() => setDeleteCardId(card.id)}><DeleteIcon fontSize="small" /></IconButton>
+                    </Box>
+                  </CardActions>
+                </>
+              )}
+            </Card>
+          );
+        })}
+      </Stack>
+
+      <Fab color="primary" sx={{ position: 'fixed', bottom: 24, right: 24 }} onClick={addCard}><AddIcon /></Fab>
+
+      <Dialog open={!!deleteCardId} onClose={() => setDeleteCardId(null)}>
+        <DialogTitle>Usuń fiszkę</DialogTitle>
+        <DialogContent>
+          <Typography>Czy na pewno chcesz usunąć tę fiszkę?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteCardId(null)}>Anuluj</Button>
+          <Button variant="contained" color="error" onClick={() => { if (deleteCardId) { store.deleteFlashcard(groupId, deleteCardId); setDeleteCardId(null); } }}>Usuń</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
