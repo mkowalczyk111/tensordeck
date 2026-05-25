@@ -1,4 +1,4 @@
-package com.fiszki.app;
+package com.tensordeck.app;
 
 import com.getcapacitor.BridgeActivity;
 

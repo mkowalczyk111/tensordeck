@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { HashRouter, Routes, Route, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -35,7 +35,6 @@ export const useNav = () => useContext(NavContext);
 
 function AppContent() {
   const navigateRouter = useNavigate();
-  const params = useParams();
   const location = useLocation();
 
   const [themePref, setThemePref] = useState<'light' | 'dark' | 'system'>('system');
@@ -67,11 +66,19 @@ function AppContent() {
   }, [location.pathname]);
 
   const nav = useMemo((): NavState => {
+    const path = location.pathname;
+    const parts = path.split('/');
+    const parsedParams: Record<string, string> = {};
+    if (path.startsWith('/study/') || path.startsWith('/browse/') || path.startsWith('/settings/')) {
+      if (parts[2]) {
+        parsedParams.groupId = decodeURIComponent(parts[2]);
+      }
+    }
     return {
       page: pageId,
-      params: (params as Record<string, string>) || {},
+      params: parsedParams,
     };
-  }, [pageId, params]);
+  }, [pageId, location.pathname]);
 
   const navigate = useCallback((page: PageId, navigateParams: Record<string, string> = {}) => {
     let path = '/';
@@ -88,7 +95,7 @@ function AppContent() {
   }, [navigateRouter]);
 
   const goBack = useCallback(() => {
-    navigateRouter(-1);
+    navigateRouter('/');
   }, [navigateRouter]);
 
   const ctx = useMemo<NavContextType>(() => ({
