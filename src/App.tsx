@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react';
-import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { HashRouter, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
@@ -103,94 +103,34 @@ function AppContent() {
     setThemeMode: setThemePref, ttsRate, setTtsRate,
   }), [nav, navigate, goBack, store, themePref, themeMode, ttsRate]);
 
+  const renderPage = () => {
+    switch (pageId) {
+      case 'dashboard': return <DashboardPage />;
+      case 'study': return <StudyPage />;
+      case 'browse': return <BrowsePage />;
+      case 'settings': return <SettingsPage />;
+      case 'import': return <ImportPage />;
+      case 'stats': return <StatsPage />;
+      case 'app-settings': return <AppSettingsPage />;
+      default: return <DashboardPage />;
+    }
+  };
+
   return (
     <NavContext.Provider value={ctx}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
           <AnimatePresence mode="wait">
-            <Routes location={location} key={location.pathname}>
-              <Route path="/" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <DashboardPage />
-                </motion.div>
-              } />
-              <Route path="/study/:groupId" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <StudyPage />
-                </motion.div>
-              } />
-              <Route path="/browse/:groupId" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <BrowsePage />
-                </motion.div>
-              } />
-              <Route path="/settings/:groupId" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <SettingsPage />
-                </motion.div>
-              } />
-              <Route path="/import" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <ImportPage />
-                </motion.div>
-              } />
-              <Route path="/stats" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <StatsPage />
-                </motion.div>
-              } />
-              <Route path="/app-settings" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <AppSettingsPage />
-                </motion.div>
-              } />
-              <Route path="*" element={
-                <motion.div
-                  initial={{ opacity: 0, x: 30 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -30 }}
-                  transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
-                >
-                  <DashboardPage />
-                </motion.div>
-              } />
-            </Routes>
+            <motion.div
+              key={pageId + (nav.params.groupId || '')}
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -30 }}
+              transition={{ duration: 0.25, ease: [0.2, 0, 0, 1] }}
+            >
+              {renderPage()}
+            </motion.div>
           </AnimatePresence>
         </Box>
       </ThemeProvider>

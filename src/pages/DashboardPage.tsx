@@ -83,6 +83,8 @@ function GroupStudyButton({ group, onStudy, onModeChange }: {
 export function DashboardPage() {
   const { navigate, store } = useNav();
   const { groups, getDueCards, user, signIn, signOut } = store;
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuAnchorRef = useRef<HTMLButtonElement>(null);
 
   const handleLogin = async () => {
     try { await signIn(); } catch (e) { console.error('Login failed', e); }
@@ -100,9 +102,45 @@ export function DashboardPage() {
           <IconButton onClick={() => navigate('stats')}><BarChartIcon /></IconButton>
           <IconButton onClick={() => navigate('app-settings')}><SettingsIcon /></IconButton>
           {user ? (
-            <IconButton onClick={signOut}>
-              <Avatar src={user.photoURL || ''} sx={{ width: 32, height: 32 }}>{user.displayName?.[0]}</Avatar>
-            </IconButton>
+            <>
+              <IconButton
+                ref={userMenuAnchorRef}
+                onClick={() => setUserMenuOpen(prev => !prev)}
+              >
+                <Avatar src={user.photoURL || ''} sx={{ width: 32, height: 32 }}>{user.displayName?.[0]}</Avatar>
+              </IconButton>
+              <Popper open={userMenuOpen} anchorEl={userMenuAnchorRef.current} transition placement="bottom-end" sx={{ zIndex: 1300 }}>
+                {({ TransitionProps }) => (
+                  <Grow {...TransitionProps}>
+                    <Paper elevation={8} sx={{ p: 2, minWidth: 220 }}>
+                      <ClickAwayListener onClickAway={() => setUserMenuOpen(false)}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                          <Avatar src={user.photoURL || ''} sx={{ width: 48, height: 48, mb: 1 }}>{user.displayName?.[0]}</Avatar>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 600, textAlign: 'center' }}>
+                            {user.displayName || 'Użytkownik'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1, textAlign: 'center', wordBreak: 'break-all' }}>
+                            {user.email}
+                          </Typography>
+                          <Button
+                            variant="outlined"
+                            color="error"
+                            size="small"
+                            fullWidth
+                            onClick={() => {
+                              signOut();
+                              setUserMenuOpen(false);
+                            }}
+                          >
+                            Wyloguj się
+                          </Button>
+                        </Box>
+                      </ClickAwayListener>
+                    </Paper>
+                  </Grow>
+                )}
+              </Popper>
+            </>
           ) : (
             <IconButton onClick={handleLogin}><PersonIcon /></IconButton>
           )}
